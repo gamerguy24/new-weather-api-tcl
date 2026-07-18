@@ -1,51 +1,57 @@
-# NEXRAD Live Weather Radar — static client-side API
+# NEXRAD Live Weather Radar API
 
 Live **NEXRAD Level II** base-reflectivity radar from the public **AWS Open Data**
-feed (`s3://unidata-nexrad-level2`), with **no server and no AWS account**.
+feed (`s3://unidata-nexrad-level2`) — **no AWS account**. It lists radar sites,
+downloads raw Level II volume scans, and decodes + renders base reflectivity
+(including bzip2) in JavaScript. The decoder was validated byte-for-byte against
+MetPy. Ships in three forms that share the same decode/render code:
 
-Everything runs in the browser: `nexrad.js` lists radar sites, downloads raw
-Level II volume scans straight from S3 (the bucket allows anonymous GETs with
-open CORS), and decodes + renders base reflectivity — including bzip2 — entirely
-client-side. The JavaScript decoder was validated byte-for-byte against MetPy.
+- **`server/` — curl-able HTTP API (Node), hosted free on Render. ⭐ recommended.**
+  ```
+  GET /radar?site=KTLX              -> JSON metadata
+  GET /radar?site=KTLX&format=png   -> base-reflectivity PNG
+  GET /radar.png?site=KTLX          -> PNG
+  GET /sites                        -> sites reporting today
+  GET /health                       -> { status: "ok" }
+  ```
+- **`site/` — static browser module** (`nexrad.js`): import it into a web page and
+  call `getScan("KTLX")`; decodes in the browser, no server. See
+  [site/README.md](site/README.md).
+- **`worker/` — Cloudflare Worker** (same HTTP API). Works, but needs the Workers
+  **Paid** plan because the decode uses ~1–2 s CPU vs the free plan's 10 ms cap.
+  Render's free tier has **no** such CPU limit, which is why Render is recommended.
+- **`build/`** — Node dev tooling (`smoke.mjs`, `e2e.mjs`, the esbuild bzip2 bundle).
 
-```js
-import * as NEXRAD from './nexrad.js';
-const scan = await NEXRAD.getScan('KTLX', { size: 1400 });
-document.querySelector('img').src = scan.toDataURL();   // rendered radar PNG
-console.log(scan.metadata());                            // JSON metadata
-```
+## Host the API on Render (free)
 
-- **The API and how to use it:** [`site/`](site/) and **[site/README.md](site/README.md)**.
-- **`worker/`** — an optional **Cloudflare Worker** that turns the same decode
-  code into a real, `curl`-able HTTP API (`GET /radar?site=KTLX` → JSON or PNG).
-  Needs the Workers **Paid** plan ($5/mo) because the decode uses ~1–2 s of CPU
-  (the free plan caps at 10 ms). See **[worker/README.md](worker/README.md)**.
-- **`build/`** — Node dev tooling: `smoke.mjs` (download + decode + render a real
-  scan to a PNG, pure Node), `e2e.mjs` (headless-browser test), and the esbuild
-  config that produces `site/vendor/bz2.js`. Not needed to host the site.
-
-## Host it on Render (free)
-
-Render's **Static Sites are free** (global CDN, no server). This repo ships a
-[`render.yaml`](render.yaml) blueprint that publishes the `site/` folder.
+A Render **Web Service** runs Node with no per-request CPU limit, so the decode
+runs fine on the **free** tier. This repo's [`render.yaml`](render.yaml) blueprint
+deploys `server/server.js`.
 
 1. Push this repo to GitHub/GitLab.
 2. In Render: **New → Blueprint**, select the repo. Render reads `render.yaml`
-   and creates a **Static Site** (`runtime: static`, publish path `./site`, no
-   build step).
-3. It goes live at `https://<name>.onrender.com/`. Your hosted module URL is
-   `https://<name>.onrender.com/nexrad.js`.
+   and creates a Node **Web Service** (`runtime: node`, `plan: free`).
+3. It goes live at `https://<name>.onrender.com/`. Try:
+   ```
+   curl "https://<name>.onrender.com/radar?site=KTLX"
+   curl "https://<name>.onrender.com/radar.png?site=KTLX" -o radar.png
+   ```
 
-Prefer to click through the dashboard instead of the blueprint? **New → Static
-Site** → connect the repo → **Publish directory:** `site` → leave the build
-command empty.
+Prefer the dashboard? **New → Web Service** → connect the repo → Build:
+`npm install`, Start: `node server/server.js`, Health check path: `/health`.
 
-> Why static (not the old Python web service): the whole pipeline is now
-> JavaScript, so there's nothing to run server-side. A Static Site is free and
-> never spins down — unlike a free Web Service, which sleeps when idle.
+**Run it locally:**
+```bash
+npm start                      # http://localhost:5000
+curl "http://localhost:5000/radar?site=KTLX"
+```
 
-Other free static hosts work the same way (serve the `site/` folder): GitHub
-Pages, Netlify, Cloudflare Pages.
+> Free-tier note: a free Render Web Service **spins down after ~15 min idle**, so
+> the first request after a nap does a cold start (a few extra seconds). Later
+> requests are fast, and each scan is cached in memory.
+
+The static browser module in `site/` can also be hosted free (Render Static Site,
+GitHub Pages, Netlify, Cloudflare Pages) — see [site/README.md](site/README.md).
 
 ## Data source
 

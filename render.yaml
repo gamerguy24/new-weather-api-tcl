@@ -1,21 +1,24 @@
-# Render Blueprint — free Static Site hosting for the client-side NEXRAD API.
+# Render Blueprint — free Node Web Service exposing the curl-able radar API.
 #
-# Render's Static Sites are free and served from a global CDN. There is no
-# server and no real build step: the files in site/ (including the prebuilt
-# bzip2 bundle at site/vendor/bz2.js) are published as-is. All decoding happens
-# in the visitor's browser.
+# Unlike Cloudflare's free Workers (10 ms CPU cap), a Render Web Service has no
+# per-request CPU limit, so the ~1-2 s bzip2 decode runs fine on the free tier.
+# There are no npm dependencies; the server uses Node built-ins + the repo's own
+# decode/render modules.
 #
-# Deploy: push this repo to GitHub/GitLab, then in Render choose
-# New > Blueprint and select the repo. Render reads this file and creates the
-# static site. It goes live at https://<name>.onrender.com/.
+# Deploy: push to GitHub, then in Render choose New > Blueprint and pick the
+# repo. It goes live at https://<name>.onrender.com/ — e.g.
+#   https://<name>.onrender.com/radar?site=KTLX
+#   https://<name>.onrender.com/radar.png?site=KTLX
 services:
   - type: web
     name: nexrad-radar-api
-    runtime: static
-    staticPublishPath: ./site
-    buildCommand: "echo 'no build step - static files are prebuilt'"
-    pullRequestPreviewsEnabled: false
-    headers:
-      - path: /*
-        name: Cache-Control
-        value: "public, max-age=600"
+    runtime: node
+    plan: free
+    region: ohio                 # close to the us-east-1 NEXRAD buckets
+    buildCommand: "npm install"
+    startCommand: "node server/server.js"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"

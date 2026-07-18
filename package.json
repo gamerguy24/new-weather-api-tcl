@@ -1,0 +1,11 @@
+{
+  "name": "nexrad-radar-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Curl-able NEXRAD Level II radar HTTP API (Node) + static browser API",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server/server.js"
+  }
+}
