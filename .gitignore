@@ -1,0 +1,4 @@
+build/node_modules/
+build/*.bin
+build/*.png
+build/ref.json

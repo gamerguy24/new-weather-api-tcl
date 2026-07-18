@@ -1,0 +1,21 @@
+# Render Blueprint — free Static Site hosting for the client-side NEXRAD API.
+#
+# Render's Static Sites are free and served from a global CDN. There is no
+# server and no real build step: the files in site/ (including the prebuilt
+# bzip2 bundle at site/vendor/bz2.js) are published as-is. All decoding happens
+# in the visitor's browser.
+#
+# Deploy: push this repo to GitHub/GitLab, then in Render choose
+# New > Blueprint and select the repo. Render reads this file and creates the
+# static site. It goes live at https://<name>.onrender.com/.
+services:
+  - type: web
+    name: nexrad-radar-api
+    runtime: static
+    staticPublishPath: ./site
+    buildCommand: "echo 'no build step - static files are prebuilt'"
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: "public, max-age=600"
