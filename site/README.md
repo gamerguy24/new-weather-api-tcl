@@ -74,7 +74,7 @@ js/render.js       georeference + smoothing + NWS dBZ color ramp -> RGBA
 js/s3.js           S3 REST listing + streaming download
 js/sites.js        site names/coords for listSites()
 vendor/bz2.js      bundled pure-JS bzip2 decompressor
-index.html         demo page (dropdown -> image + JSON); not required to use the API
+index.html         static docs/landing page (no demo, no UI); the API is nexrad.js
 ```
 
 ## Run locally
@@ -85,7 +85,7 @@ ES modules + a module worker need **http**, not `file://`:
 cd site && python -m http.server 8000     # then open http://localhost:8000
 ```
 
-The demo also accepts URL params: `?site=KLOT`, `?autoload=0`, `?format=json`.
+The page at `/` is just documentation; the API is the importable `nexrad.js` module.
 
 ## Deploy (all free, no build step)
 

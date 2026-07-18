@@ -1,35 +1,37 @@
+// Verify the shipped nexrad.js module works standalone (no demo page involved):
+// load a blank page from the host, dynamically import the module, and use it.
 import puppeteer from 'puppeteer-core';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new',
   args: ['--no-sandbox', '--disable-gpu'] });
 const page = await browser.newPage();
-await page.setViewport({ width: 1280, height: 900 });
 const logs = [];
-page.on('console', m => logs.push('[console] ' + m.text()));
 page.on('pageerror', e => logs.push('[pageerror] ' + e.message));
-page.on('requestfailed', r => logs.push('[reqfail] ' + r.url() + ' ' + (r.failure()?.errorText)));
+page.on('requestfailed', r => { const u = r.url(); if (!u.endsWith('favicon.ico')) logs.push('[reqfail] ' + u); });
 
-await page.goto('http://localhost:8770/', { waitUntil: 'networkidle2', timeout: 30000 });
-try {
-  await page.waitForFunction(() => {
-    const s = document.getElementById('status')?.textContent || '';
-    return s.includes('done') || s.startsWith('error');
-  }, { timeout: 60000 });
-} catch (e) { logs.push('[timeout waiting for status]'); }
+await page.goto('http://localhost:8770/', { waitUntil: 'domcontentloaded' });
 
-const statusText = await page.$eval('#status', el => el.textContent);
-const siteCount = await page.$eval('#site', el => el.options.length);
-const imgSrc = await page.$eval('#out', el => (el.src || '').slice(0, 24));
-const metaText = await page.$eval('#meta', el => el.textContent);
-let meta = null; try { meta = JSON.parse(metaText); } catch {}
+const result = await page.evaluate(async () => {
+  const N = await import('/nexrad.js');
+  const sites = await N.listSites();
+  const scan = await N.getScan('KTLX', { size: 600 });
+  return {
+    nSites: sites.length,
+    exports: Object.keys(N).sort(),
+    site: scan.site, key: scan.key, scanTimeUTC: scan.scanTimeUTC,
+    bounds: scan.bounds,
+    pngOK: scan.toDataURL().startsWith('data:image/png'),
+    meta: scan.metadata(),
+  };
+});
 
-console.log('STATUS:', JSON.stringify(statusText));
-console.log('SITE OPTIONS:', siteCount);
-console.log('IMG src prefix:', imgSrc);
-console.log('META site/key:', meta && meta.site, meta && meta.key);
-console.log('META bounds:', meta && JSON.stringify(meta.bounds));
-console.log('META scanTimeUTC:', meta && meta.scanTimeUTC);
-console.log('--- browser logs ---'); logs.forEach(l => console.log(l));
-await page.screenshot({ path: 'e2e_api.png' });
-console.log('screenshot saved');
+console.log('exports:', result.exports.join(', '));
+console.log('listSites ->', result.nSites, 'sites');
+console.log('getScan  ->', result.site, result.key);
+console.log('scanTimeUTC:', result.scanTimeUTC);
+console.log('toDataURL is PNG:', result.pngOK);
+console.log('bounds:', JSON.stringify(result.bounds));
+console.log('metadata keys:', Object.keys(result.meta).sort().join(', '));
+if (logs.length) { console.log('--- issues ---'); logs.forEach(l => console.log(l)); }
+else console.log('no page errors');
 await browser.close();

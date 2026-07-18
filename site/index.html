@@ -3,125 +3,59 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NEXRAD Radar API — static</title>
+  <title>NEXRAD Radar — static client-side API</title>
   <style>
     :root { color-scheme: dark; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui, sans-serif; background: #14161c; color: #e7e9ee; }
-    header { padding: 20px 24px 8px; }
-    h1 { font-size: 18px; margin: 0 0 4px; }
-    .sub { color: #8b93a1; font-size: 13px; }
-    main { display: grid; grid-template-columns: 320px 1fr; gap: 20px; padding: 16px 24px 32px; align-items: start; }
-    @media (max-width: 780px) { main { grid-template-columns: 1fr; } }
-    .card { background: #1b1e26; border: 1px solid #2a2e38; border-radius: 10px; padding: 16px; }
-    label.cap { font-size: 11px; color: #9aa0ab; text-transform: uppercase; letter-spacing: .5px; }
-    select, button { width: 100%; padding: 9px; margin-top: 6px; border-radius: 7px; border: 1px solid #3a3f4b; background: #23262f; color: #e7e9ee; font-size: 14px; }
-    button { cursor: pointer; background: #2f6fed; border-color: #2f6fed; margin-top: 12px; font-weight: 600; }
-    button:hover { background: #245ccc; }
-    #status { margin-top: 10px; font-size: 12.5px; color: #7fd18a; min-height: 16px; }
-    #progresswrap { height: 4px; background: #23262f; border-radius: 3px; margin-top: 10px; overflow: hidden; }
-    #progress { height: 100%; width: 0; background: #2f6fed; transition: width .15s; opacity: 0; }
-    .imgwrap { background:
-        linear-gradient(45deg, #1a1d24 25%, transparent 25%) 0 0/24px 24px,
-        linear-gradient(-45deg, #1a1d24 25%, transparent 25%) 0 0/24px 24px,
-        #12141a; border: 1px solid #2a2e38; border-radius: 10px; display: flex; align-items: center; justify-content: center; min-height: 340px; overflow: hidden; }
-    .imgwrap img { max-width: 100%; height: auto; display: block; }
-    pre { background: #0f1116; border: 1px solid #2a2e38; border-radius: 10px; padding: 14px; font-size: 12px; line-height: 1.5; overflow: auto; margin-top: 14px; color: #cdd3dd; }
-    .legend { margin-top: 14px; font-size: 11px; color: #9aa0ab; }
-    .legend .bar { height: 12px; border-radius: 3px; margin: 4px 0; }
-    .legend .scale { display: flex; justify-content: space-between; }
-    code.k { color: #8fd0ff; }
+    body { margin: 0; font-family: system-ui, sans-serif; background: #14161c; color: #e7e9ee; line-height: 1.55; }
+    main { max-width: 760px; margin: 0 auto; padding: 40px 24px 64px; }
+    h1 { font-size: 20px; margin: 0 0 6px; }
+    .sub { color: #8b93a1; font-size: 14px; margin-bottom: 28px; }
+    h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .5px; color: #9aa0ab; margin: 28px 0 8px; }
+    pre { background: #0f1116; border: 1px solid #2a2e38; border-radius: 10px; padding: 16px; overflow: auto; font-size: 13px; }
+    code { color: #8fd0ff; }
+    table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+    td, th { border: 1px solid #2a2e38; padding: 7px 10px; text-align: left; vertical-align: top; }
+    th { color: #9aa0ab; font-weight: 600; }
     a { color: #8fb7ff; }
+    .note { font-size: 13px; color: #8b93a1; margin-top: 24px; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>🌩️ NEXRAD Radar — static client-side API</h1>
-    <div class="sub">No server. Level II is listed, downloaded, and decoded entirely in your browser from AWS Open Data. This page is just a demo of <code class="k">nexrad.js</code>.</div>
-  </header>
-
   <main>
-    <div class="card">
-      <label class="cap" for="site">Radar site</label>
-      <select id="site"></select>
-      <button id="load">getScan()</button>
-      <div id="progresswrap"><div id="progress"></div></div>
-      <div id="status"></div>
-      <div class="legend">
-        <div>Base reflectivity (dBZ)</div>
-        <div class="bar" id="legendbar"></div>
-        <div class="scale"><span>5</span><span>25</span><span>45</span><span>65</span><span>75</span></div>
-      </div>
-    </div>
+    <h1>🌩️ NEXRAD Radar — static client-side API</h1>
+    <div class="sub">This host serves one thing: <code>nexrad.js</code>. It's a JavaScript
+      module you import from a web page — it lists radar sites and decodes live NEXRAD
+      Level II from AWS Open Data entirely in the browser. There is no server and no UI here.</div>
 
-    <div>
-      <div class="imgwrap"><img id="out" alt="radar output" /></div>
-      <pre id="meta">// metadata will appear here</pre>
-    </div>
+    <h2>Use it</h2>
+    <pre><code>import * as NEXRAD from "<span id="here">./nexrad.js</span>";
+
+const sites = await NEXRAD.listSites();            // [{ code, name, lat, lon }]
+const scan  = await NEXRAD.getScan("KTLX");        // newest scan for a site
+
+scan.metadata();     // { site, key, scanTimeUTC, siteLat, siteLon, bounds, ... }
+scan.toDataURL();    // rendered base-reflectivity PNG (data URL)
+scan.imageData;      // raw pixels (ImageData) if you want to draw it yourself</code></pre>
+
+    <h2>API</h2>
+    <table>
+      <tr><th>Call</th><th>Returns</th></tr>
+      <tr><td><code>listSites()</code></td><td>sites reporting today: <code>[{ code, name, lat, lon }]</code></td></tr>
+      <tr><td><code>latestKey(site)</code></td><td>newest S3 key, or <code>null</code></td></tr>
+      <tr><td><code>getScan(siteOrKey, opts)</code></td><td>a Scan object (metadata + <code>toDataURL()</code> / <code>toBlob()</code> / <code>imageData</code>)</td></tr>
+      <tr><td><code>decode(arrayBuffer)</code></td><td>low-level decoded radials</td></tr>
+      <tr><td><code>render(decoded, {size})</code></td><td>RGBA raster + lat/lon bounds</td></tr>
+    </table>
+
+    <p class="note">Full reference: <a href="README.md">README.md</a>. Source:
+      <code>nexrad.js</code>, <code>js/</code>, <code>vendor/bz2.js</code>.
+      A static host serves files, not computed responses, so this is a JavaScript API
+      you import — not a <code>curl</code>-able endpoint.</p>
   </main>
 
-  <script type="module">
-    import * as NEXRAD from './nexrad.js';
-
-    const $ = (id) => document.getElementById(id);
-    const status = (m) => { $('status').textContent = m || ''; };
-    const setProgress = (f) => { const el = $('progress'); el.style.width = (f == null ? 0 : Math.round(f * 100)) + '%'; el.style.opacity = f == null ? 0 : 1; };
-
-    const COLORS = ['#04e9e7','#019ff4','#0300f4','#02fd02','#01c501','#008e00','#fdf802','#e5bc00','#fd9500','#fd0000','#d40000','#bc0000','#f800fd','#9854c6'];
-    $('legendbar').style.background = 'linear-gradient(to right, ' + COLORS.join(', ') + ')';
-
-    let busy = false;
-
-    async function populate() {
-      status('listSites()…');
-      const sites = await NEXRAD.listSites();
-      const sel = $('site');
-      sel.innerHTML = '';
-      for (const s of sites) {
-        const o = document.createElement('option');
-        o.value = s.code;
-        o.textContent = s.name ? `${s.code} - ${s.name}` : s.code;
-        sel.appendChild(o);
-      }
-      const params = new URLSearchParams(location.search);
-      const want = (params.get('site') || 'KTLX').toUpperCase();
-      if ([...sel.options].some(o => o.value === want)) sel.value = want;
-      status(sites.length + ' sites reporting');
-      return sites.length;
-    }
-
-    async function load() {
-      if (busy) return;
-      busy = true;
-      const site = $('site').value;
-      try {
-        status(`getScan("${site}") — downloading + decoding…`);
-        setProgress(0);
-        const scan = await NEXRAD.getScan(site, { size: 1400, onProgress: setProgress });
-        setProgress(null);
-        $('out').src = scan.toDataURL();
-        $('meta').textContent = JSON.stringify(scan.metadata(), null, 2);
-        status('done ✓ decoded in-browser');
-      } catch (e) {
-        setProgress(null);
-        status('error: ' + e.message);
-      } finally {
-        busy = false;
-      }
-    }
-
-    $('load').addEventListener('click', load);
-    $('site').addEventListener('change', load);
-
-    (async () => {
-      const n = await populate();
-      // ?format=json → behave like an endpoint: dump metadata as plain text.
-      const params = new URLSearchParams(location.search);
-      if (n && params.get('autoload') !== '0') await load();
-      if (params.get('format') === 'json') {
-        document.body.innerHTML = '<pre style="padding:20px">' + $('meta').textContent + '</pre>';
-      }
-    })();
+  <script>
+    // Show the absolute module URL for this deployment (informational only).
+    document.getElementById("here").textContent = new URL("nexrad.js", location.href).href;
   </script>
 </body>
 </html>
