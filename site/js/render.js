@@ -76,7 +76,8 @@ export function render(dec, opts = {}) {
       rgba[o] = LUT[l]; rgba[o + 1] = LUT[l + 1]; rgba[o + 2] = LUT[l + 2]; rgba[o + 3] = alpha;
     }
   }
-  return { rgba, width: W, height: H, bounds, siteLat, siteLon };
+  return { rgba, width: W, height: H, bounds, siteLat, siteLon,
+           numGates, firstGateKm, gateWidthKm };
 }
 
 // Bilinear sample of the polar field at (azimuth deg, gate float index).

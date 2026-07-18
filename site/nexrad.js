@@ -129,7 +129,7 @@ function getWorker() {
 function decodeRender(arrayBuffer, size) {
   const w = getWorker();
   if (!w) {                                        // no worker: do it inline
-    const dec = decodeLevel2(arrayBuffer, bunzip);
+    const dec = decodeLevel2(arrayBuffer, bunzip, { firstSweepOnly: true });
     return Promise.resolve(_render(dec, { size }));
   }
   return new Promise((resolve, reject) => {

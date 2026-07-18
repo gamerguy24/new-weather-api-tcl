@@ -7,7 +7,7 @@ import { render } from './js/render.js';
 self.onmessage = (e) => {
   const { id, arrayBuffer, size } = e.data;
   try {
-    const dec = decodeLevel2(arrayBuffer, bunzip);
+    const dec = decodeLevel2(arrayBuffer, bunzip, { firstSweepOnly: true });
     const img = render(dec, { size });
     self.postMessage(
       { id, ok: true, rgba: img.rgba, width: img.width, height: img.height,

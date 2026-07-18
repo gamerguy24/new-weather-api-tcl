@@ -1,0 +1,8 @@
+name = "nexrad-radar-api"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+# The bzip2 decode uses ~1-2 s of CPU per fresh scan, so raise the CPU limit.
+# This requires the Workers PAID plan; the Free plan caps CPU at 10 ms.
+[limits]
+cpu_ms = 30000

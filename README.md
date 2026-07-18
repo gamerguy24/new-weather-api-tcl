@@ -16,6 +16,10 @@ console.log(scan.metadata());                            // JSON metadata
 ```
 
 - **The API and how to use it:** [`site/`](site/) and **[site/README.md](site/README.md)**.
+- **`worker/`** — an optional **Cloudflare Worker** that turns the same decode
+  code into a real, `curl`-able HTTP API (`GET /radar?site=KTLX` → JSON or PNG).
+  Needs the Workers **Paid** plan ($5/mo) because the decode uses ~1–2 s of CPU
+  (the free plan caps at 10 ms). See **[worker/README.md](worker/README.md)**.
 - **`build/`** — Node dev tooling: `smoke.mjs` (download + decode + render a real
   scan to a PNG, pure Node), `e2e.mjs` (headless-browser test), and the esbuild
   config that produces `site/vendor/bz2.js`. Not needed to host the site.

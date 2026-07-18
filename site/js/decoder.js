@@ -8,7 +8,11 @@
 const CTM = 12;          // channel-terminal-manager spacer before each message
 const MSG_HDR = 16;
 
-export function decodeLevel2(arrayBuffer, bunzip) {
+// opts.firstSweepOnly: stop after the first (lowest, 0.5°) reflectivity
+// elevation instead of decompressing all ~18 cuts. Same sweep-0 result, but
+// ~10x less CPU and memory — important inside a Cloudflare Worker (128 MB).
+export function decodeLevel2(arrayBuffer, bunzip, opts = {}) {
+  const firstSweepOnly = !!opts.firstSweepOnly;
   const bytes = new Uint8Array(arrayBuffer);
   const dv = new DataView(arrayBuffer);
   const td = new TextDecoder('ascii');
@@ -16,13 +20,14 @@ export function decodeLevel2(arrayBuffer, bunzip) {
   const radials = [];
   let siteLat = null, siteLon = null;
   let firstGateKm = null, gateWidthKm = null, numGates = null;
+  let targetElev = null, stop = false;
 
   // 24-byte Volume Header Record, then LDM records: [int32 BE size][bzip2 data].
   // Each record decompresses to a whole number of messages (none span a record
   // boundary), and the metadata record pads messages, so we MUST frame each
   // record independently instead of over one concatenated buffer.
   let pos = 24;
-  while (pos + 4 <= bytes.length) {
+  while (pos + 4 <= bytes.length && !stop) {
     const ctrl = dv.getInt32(pos, false);
     pos += 4;
     const size = Math.abs(ctrl);
@@ -40,6 +45,10 @@ export function decodeLevel2(arrayBuffer, bunzip) {
       if (msgType === 31) {
         const r = parseMsg31(rec, rdv, td, hdr + MSG_HDR);
         if (r) {
+          if (firstSweepOnly && r.ref) {
+            if (targetElev === null) targetElev = r.elevNum;
+            else if (r.elevNum !== targetElev) { stop = true; break; }  // past sweep 0
+          }
           radials.push(r);
           if (siteLat === null && r.lat !== null) { siteLat = r.lat; siteLon = r.lon; }
           if (numGates === null && r.ref) {
