@@ -6,6 +6,6 @@
   "description": "Curl-able NEXRAD Level II radar HTTP API (Node) + static browser API",
   "engines": { "node": ">=18" },
   "scripts": {
-    "start": "node server/server.js"
+    "start": "node --max-old-space-size=384 server/server.js"
   }
 }

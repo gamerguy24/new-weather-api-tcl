@@ -22,11 +22,20 @@ import { SITES } from '../site/js/sites.js';
 
 const S3 = 'https://unidata-nexrad-level2.s3.amazonaws.com';
 const PORT = process.env.PORT || 5000;
+const DEFAULT_SIZE = 1000;             // memory/quality balance for a 512 MB box
 
 // Small in-memory cache: expensive render result per scan key.
 const cache = new Map();               // cacheKey -> { body, headers }
-const CACHE_MAX = 48;
+const CACHE_MAX = 24;
 let latestCache = new Map();           // site -> { exp, key }
+
+// Run heavy work one-at-a-time so concurrent requests don't stack memory.
+let _chain = Promise.resolve();
+function runExclusive(fn) {
+  const run = _chain.then(fn, fn);
+  _chain = run.then(() => {}, () => {});   // keep the chain alive past errors
+  return run;
+}
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -63,7 +72,7 @@ async function handleRadar(url, res) {
   const site = (url.searchParams.get('site') || '').toUpperCase();
   let key = url.searchParams.get('key');
   const wantPng = url.pathname === '/radar.png' || url.searchParams.get('format') === 'png';
-  const size = clamp(parseInt(url.searchParams.get('size') || '1200', 10) || 1200, 300, 2000);
+  const size = clamp(parseInt(url.searchParams.get('size') || String(DEFAULT_SIZE), 10) || DEFAULT_SIZE, 300, 2000);
 
   if (!key) {
     if (!site) return sendJSON(res, 400, { error: 'missing ?site= (e.g. /radar?site=KTLX)' });
@@ -71,33 +80,43 @@ async function handleRadar(url, res) {
     if (!key) return sendJSON(res, 404, { error: `no recent data for ${site}` });
   }
   const siteCode = site || key.split('/')[3] || null;
-
   const cacheKey = `${key}|${wantPng ? 'png' : 'json'}|${size}`;
+
   const hit = cache.get(cacheKey);
   if (hit) return end(res, 200, hit.headers, hit.body);
 
-  const buf = await (await fetch(`${S3}/${key}`)).arrayBuffer();
-  const dec = decodeLevel2(buf, bunzip, { firstSweepOnly: true });
-  const img = render(dec, { size });
-  const meta = metadata(siteCode, key, img);
+  // Serialize the memory-heavy decode so concurrent requests can't stack their
+  // ~150 MB transients and blow the 512 MB limit. Queued callers reuse the
+  // cache the first one fills.
+  const out = await runExclusive(async () => {
+    const again = cache.get(cacheKey);
+    if (again) return again;
 
-  let status = 200, headers, body;
-  if (wantPng) {
-    body = encodePNG(img.rgba, img.width, img.height);
-    headers = {
-      'Content-Type': 'image/png',
-      'Cache-Control': 'public, max-age=120',
-      'X-Radar-Bounds': `${meta.bounds.south},${meta.bounds.west},${meta.bounds.north},${meta.bounds.east}`,
-      'X-Scan-Time': meta.scanTimeUTC || '',
-    };
-  } else {
-    meta.image = `/radar.png?site=${siteCode}&key=${encodeURIComponent(key)}&size=${size}`;
-    body = JSON.stringify(meta, null, 2);
-    headers = { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=120' };
-  }
-  if (cache.size >= CACHE_MAX) cache.clear();
-  cache.set(cacheKey, { headers, body });
-  end(res, status, headers, body);
+    const buf = await (await fetch(`${S3}/${key}`)).arrayBuffer();
+    const dec = decodeLevel2(buf, bunzip, { firstSweepOnly: true });
+    const img = render(dec, { size });
+    const meta = metadata(siteCode, key, img);
+
+    let headers, body;
+    if (wantPng) {
+      body = encodePNG(img.rgba, img.width, img.height);
+      headers = {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=120',
+        'X-Radar-Bounds': `${meta.bounds.south},${meta.bounds.west},${meta.bounds.north},${meta.bounds.east}`,
+        'X-Scan-Time': meta.scanTimeUTC || '',
+      };
+    } else {
+      meta.image = `/radar.png?site=${siteCode}&key=${encodeURIComponent(key)}&size=${size}`;
+      body = JSON.stringify(meta, null, 2);
+      headers = { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=120' };
+    }
+    if (cache.size >= CACHE_MAX) cache.clear();
+    cache.set(cacheKey, { headers, body });
+    return { headers, body };
+  });
+
+  end(res, 200, out.headers, out.body);
 }
 
 // --------------------------------------------------------------------------

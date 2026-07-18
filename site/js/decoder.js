@@ -45,9 +45,12 @@ export function decodeLevel2(arrayBuffer, bunzip, opts = {}) {
       if (msgType === 31) {
         const r = parseMsg31(rec, rdv, td, hdr + MSG_HDR);
         if (r) {
-          if (firstSweepOnly && r.ref) {
-            if (targetElev === null) targetElev = r.elevNum;
-            else if (r.elevNum !== targetElev) { stop = true; break; }  // past sweep 0
+          if (firstSweepOnly) {
+            // Lock onto the first reflectivity cut, then stop the moment ANY
+            // radial from a different elevation appears (including the velocity
+            // split cut, which carries no REF) — so we never decode past sweep 0.
+            if (r.ref && targetElev === null) targetElev = r.elevNum;
+            if (targetElev !== null && r.elevNum !== targetElev) { stop = true; break; }
           }
           radials.push(r);
           if (siteLat === null && r.lat !== null) { siteLat = r.lat; siteLon = r.lon; }

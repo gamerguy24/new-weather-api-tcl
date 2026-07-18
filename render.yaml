@@ -16,7 +16,10 @@ services:
     plan: free
     region: ohio                 # close to the us-east-1 NEXRAD buckets
     buildCommand: "npm install"
-    startCommand: "node server/server.js"
+    # Cap V8's heap so it garbage-collects within the 512 MB container instead
+    # of growing until Render OOM-kills it (Node otherwise sizes the heap to the
+    # host's RAM, not the container limit).
+    startCommand: "node --max-old-space-size=384 server/server.js"
     healthCheckPath: /health
     autoDeploy: true
     envVars:
